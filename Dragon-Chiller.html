@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Dragon Chiller 3D</title>
+<style>
+    
+body {
+    margin:0;
+    background-color:black;
+}   
+    
+</style>
+    </head>
+    <body>
+        <canvas></canvas>
+
+<script>
+
+class Point{
+    constructor(x,y,z){
+        this.x=x
+        this.y=y
+        this.z=z
+    }
+}
+
+class Star{
+    constructor(x,y){
+        this.x=x
+        this.y=y
+        this.life=Math.random()*Math.PI*2
+    }
+}
+
+class Dragon{
+    constructor(p){
+        this.position=p
+        this.trail=[]
+        this.health=100
+    }
+}
+
+
+
+const init=(_)=>{
+    const canvas=document.querySelector("canvas")
+    const w=canvas.width=Math.min(innerWidth,innerHeight)
+    const h=canvas.height=w
+    const ctx=canvas.getContext("2d")
+    
+    const divs=100
+    const bullets=[]
+    let shooting=false
+    const dragon=new Dragon(new Point(w*2,h/2,50))
+    const camera=new Point(2*w,3*h/4,0)
+    const e=new Point(0,0,5)
+    let touchx,touchy;
+    const stars=[]
+    for(let i=0;i<50;++i){
+        stars.push(new Star(w*Math.random(),h*Math.random()))
+    }
+    const road=[]
+    ctx.strokeStyle="cyan"
+    for(let z=100;z>0;--z){
+        const row=[]
+        for(let x=0;x<4*w/divs;++x)
+            row.push(new Point(x*divs,h+Math.random()*50,z))
+        road.push(row)
+    }
+    function drawHealth(){
+        ctx.fillStyle="red"
+        ctx.fillRect(w/2-100,0.1*h,200,10)
+        ctx.lineWidth=2
+        ctx.strokeRect(w/2-100,0.1*h,200,10)
+        ctx.fillStyle="lime"
+        ctx.fillRect(w/2-100,0.1*h,2*dragon.health,10)
+        ctx.lineWidth=1
+    }
+    function drawBullets(){
+        ctx.strokeStyle="yellow"
+        ctx.lineWidth =3
+        for(const bullet of bullets){
+            ctx.beginPath()
+            ctx.arc(...projection(bullet),40/bullet.z,0,Math.PI*2)
+            ctx.closePath()
+            ctx.stroke()
+            bullet.z+=0.5
+        }
+        ctx.lineWidth=1
+        ctx.strokeStyle ="cyan"
+    }
+    function drawDragon(d){
+        ctx.strokeStyle ="magenta"
+        for(let i=0;i<d.trail.length;++i){
+            const t=d.trail[i]
+            ctx.beginPath()
+            ctx.arc(...projection(t),i/5*(100/t.z),0,Math.PI*2)
+            ctx.closePath()
+            ctx.stroke()
+        }
+        ctx.fillStyle="grey"
+        ctx.beginPath()
+        ctx.arc(...projection(d.position),5*(100/d.position.z),0,Math.PI*2)
+        ctx.closePath()
+        ctx.fill()
+        ctx.strokeStyle="cyan"
+    }
+    function drawPoint(p){
+        [bx,by]=projection(p)
+        ctx.beginPath()
+        ctx.arc(bx,by,0.25*(100/p.z),0,Math.PI*2)
+        ctx.fill()
+    }
+    function drawStar(s){
+        ctx.beginPath()
+        ctx.fillStyle ="white"
+        ctx.arc(s.x,s.y,1+Math.sin(s.life),0,Math.PI*2)
+        ctx.closePath()
+        ctx.fill()
+    }
+    function projection(p){
+        dx=p.x-camera.x
+        dy=p.y-camera.y
+        dz=p.z-camera.z
+        bx=e.z*dx/dz+e.x
+        by=e.z*dy/dz+e.y
+        return [bx+w/2,by+h/2]
+    }
+    function loop(time){
+        ctx.fillStyle="black"
+        ctx.fillRect(0,0,w,h)
+        
+        for(const s of stars){
+            drawStar(s)
+            s.life+=Math.PI/100
+        }
+        
+        ctx.fillStyle ="magenta"
+        ctx.beginPath ()
+        ctx.arc(w/2,0.25*h,w/10+2.5*Math.sin(time/500),0,Math.PI*2)
+        ctx.fill()
+        
+        
+        
+        let firstRow=road[0]
+        ctx.beginPath()
+        for(let i=0;i<firstRow.length;++i){
+            let [bx,by]=projection(firstRow[i])
+            ctx.moveTo(bx,by)
+            for(let j=1;j<road.length;++j){
+                let [bx2,by2]=projection(road[j][i])
+                ctx.lineTo(bx2,by2)
+            }
+        }
+        ctx.stroke()
+        
+        for(const row of road){
+            ctx.beginPath()
+            const first=row[0]
+            let [bx,by]=projection(first)
+            ctx.moveTo(bx,by)
+            for(let p of row){
+                let [bx2,by2]=projection(p)
+                ctx.lineTo(bx2,by2)
+            }
+            ctx.stroke()
+            for(const p of row){
+                drawPoint(p)
+                p.z-=0.05
+                p.y=h-0.00095*(Math.abs(2*w-p.x)**2)+20*Math.sin(p.z+Math.abs(2*w-p.x)+time/200)
+            }
+        }
+        if(road[road.length-1][0].z<0){
+            const r=[]
+            for(let x=0;x<4*w/divs;++x)
+                r.push(new Point(x*divs,h-0.00095*(Math.abs(2*w-x*divs)**2)+20*Math.sin(100+Math.abs(2*w-x*divs)+time/200),100))
+            road.unshift(r)
+            road.pop()
+        }
+        drawDragon(dragon)
+        if(dragon.trail.length<20){
+            dragon.trail.push(new Point(dragon.position.x,dragon.position.y,dragon.position.z))
+        }else{
+            dragon.trail.shift()
+            dragon.trail.push(new Point(dragon.position.x,dragon.position.y,dragon.position.z))
+        }
+        dragon.position.z=50+50*Math.sin(time/500)
+        dragon.position.x=2*w+w*Math.sin(time/400)
+        dragon.position.y=h/2+0.25*w*Math.sin(time/400)
+        if(dragon.trail.length<300){
+            dragon.trail.push()
+        }
+        drawHealth()
+        
+        drawBullets()
+        for(const bullet of bullets){
+            const distance=Math.sqrt((dragon.position.x-bullet.x)**2+(dragon.position.y-bullet.y)**2+ (dragon.position.z-bullet.z)**2)
+            if(distance<30){
+                dragon.health-=1
+                bullet.z=20000
+            }
+        }
+        if(bullets[0]&&(bullets[0].z>100))bullets.shift()
+        if(dragon.health>0)
+        requestAnimationFrame(loop)
+        else alert("You Won!")
+    }
+    window.addEventListener("touchstart",touchStart,{passive:false})
+    function touchStart(e){
+        e.preventDefault()
+        touchx=e.touches[0].pageX
+        touchy=e.touches[0].pageY
+        bullets.push(new Point(camera.x,camera.y,camera.z))
+        if(bullets.length>20) bullets.shift()
+    }
+    window.addEventListener("touchmove",touchMove,{passive:false})
+    function touchMove(e){
+        e.preventDefault()
+        camera.x+=2*(touchx-e.touches[0].pageX)
+        touchx=e.touches[0].pageX
+        camera.y+=2*(touchy-e.touches[0].pageY)
+        touchy=e.touches[0].pageY
+    }
+    
+    loop(0)
+}
+
+window.onload=()=>{
+    init()
+}
+</script>
+&copy Paul Caron</body>
+</html>
